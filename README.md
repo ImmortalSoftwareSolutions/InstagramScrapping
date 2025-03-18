@@ -24,7 +24,7 @@ JSON: Two separate files—one for profile information and another for post-rela
 2. Clone the Repository:
 
 ```
-git clone https://github.com/ImmortalSoftwareSolutions/InstagramScrapping.git
+git clone -b B1 https://github.com/ImmortalSoftwareSolutions/InstagramScrapping.git
 
 cd InstagramScrapping
 ```
