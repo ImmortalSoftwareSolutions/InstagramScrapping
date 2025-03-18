@@ -126,6 +126,50 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0,149,246,0.3);
         }
+        
+        
+        /* Center the loading indicator and spinner */
+      #loadingIndicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 10px;
+        background-color: rgba(255, 255, 255, 0.8); /* Slightly transparent background */
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000; /* Ensure it's above other content */
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3rem;
+        margin-top: 10px;
+    }
+
+    .spinner-border text-center {
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Optional: Add a fade-in animation for smoother transitions */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+  }
+
+      #loadingIndicator {
+          animation: fadeIn 0.3s ease-in;
+      }
+
 
         .table {
             background: white;
@@ -160,12 +204,13 @@
         }
 
         .post-caption {
-            max-width: 300px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: var(--text-color); /* Default text color, not bold */
+            max-width: 300px; /* You can adjust the max-width as needed */
+            white-space: normal; /* Allow text to wrap */
+            word-wrap: break-word; /* Break long words to prevent overflow */
+            overflow-wrap: break-word; /* Prevents the text from overflowing */
+            color: var(--text-color); /* Default text color */
         }
+
 
         .post-stats {
             color: var(--accent-color); /* Accent color for Likes and Comments, not bold */
@@ -226,6 +271,13 @@
                         <i class="fas fa-search me-2"></i>Analyze Profile
                     </button>
                 </div>
+                <div id="loadingIndicator" class="d-none text-center">
+                    <p>Analyzing...</p>
+                  <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+
             </form>
         </div>
 
@@ -264,6 +316,11 @@
                     <canvas id="likesChart"></canvas>
                 </div>
                 <div class="col-md-6 mb-4">
+                    <canvas id="commentsChart"></canvas>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-4">
                     <canvas id="hashtagsChart"></canvas>
                 </div>
             </div>
@@ -288,111 +345,140 @@
         </div>
     </div>
 
-    <script>
-        let likesChart, hashtagsChart;
+<script>
+    let likesChart, commentsChart, hashtagsChart;
 
-        document.getElementById('scrapeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
+    document.getElementById('scrapeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
 
-            try {
-                const response = await fetch('/scrape', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username })
+        // Show the loading indicator and hide the "Analyze Profile" button
+        document.getElementById('loadingIndicator').classList.remove('d-none');
+        document.querySelector('button[type="submit"]').disabled = true;
+
+        try {
+            const response = await fetch('/scrape', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            const data = await response.json();
+
+            document.getElementById('statsGrid').style.display = 'grid';
+            document.getElementById('visualizations').style.display = 'block';
+            document.getElementById('postsSection').style.display = 'block';
+
+            if (data.profile) {
+                document.getElementById('statName').textContent = data.profile.Name || 'N/A';
+                document.getElementById('statBio').textContent = data.profile.Bio || 'N/A';
+                document.getElementById('statPosts').textContent = data.profile.Posts || 'N/A';
+                document.getElementById('statFollowers').textContent = data.profile.Followers || 'N/A';
+                document.getElementById('statFollowing').textContent = data.profile.Following || 'N/A';
+            }
+
+            const postsTbody = document.getElementById('postsTableBody');
+            postsTbody.innerHTML = '';
+            if (data.posts && data.posts.length > 0) {
+                data.posts.forEach(post => {
+                    const row = `
+                        <tr>
+                            <td><img src="${post.media_url}" alt="Post" class="post-preview"></td>
+                            <td class="post-caption">${post.caption || 'No Caption'}</td>
+                            <td class="post-stats">${post.likes || 0}</td>
+                            <td class="post-stats">${post.comments_count || 0}</td>
+                            <td>${post.hashtags.map(tag => `<span class="hashtag-badge">${tag}</span>`).join('') || 'None'}</td>
+                            <td><a href="${post.post_url}" target="_blank" class="btn btn-sm btn-primary">View</a></td>
+                        </tr>`;
+                    postsTbody.innerHTML += row;
                 });
-                const data = await response.json();
 
-                document.getElementById('statsGrid').style.display = 'grid';
-                document.getElementById('visualizations').style.display = 'block';
-                document.getElementById('postsSection').style.display = 'block';
+                updateCharts(data.posts);
+            }
+        } catch (error) {
+            alert('Error scraping data: ' + error.message);
+        } finally {
+            // Hide the loading indicator and enable the "Analyze Profile" button again
+            document.getElementById('loadingIndicator').classList.add('d-none');
+            document.querySelector('button[type="submit"]').disabled = false;
+        }
+    });
 
-                if (data.profile) {
-                    document.getElementById('statName').textContent = data.profile.Name || 'N/A';
-                    document.getElementById('statBio').textContent = data.profile.Bio || 'N/A';
-                    document.getElementById('statPosts').textContent = data.profile.Posts || 'N/A';
-                    document.getElementById('statFollowers').textContent = data.profile.Followers || 'N/A';
-                    document.getElementById('statFollowing').textContent = data.profile.Following || 'N/A';
-                }
+    function updateCharts(posts) {
+        // Destroy existing charts
+        if (likesChart) likesChart.destroy();
+        if (commentsChart) commentsChart.destroy();
+        if (hashtagsChart) hashtagsChart.destroy();
 
-                const postsTbody = document.getElementById('postsTableBody');
-                postsTbody.innerHTML = '';
-                if (data.posts && data.posts.length > 0) {
-                    data.posts.forEach(post => {
-                        const row = `
-                            <tr>
-                                <td><img src="${post.image_url}" alt="Post" class="post-preview"></td>
-                                <td class="post-caption">${post.caption || 'No Caption'}</td>
-                                <td class="post-stats">${post.likes || 0}</td>
-                                <td class="post-stats">${post.comments || 0}</td>
-                                <td>${post.hashtags.map(tag => `<span class="hashtag-badge">${tag}</span>`).join('') || 'None'}</td>
-                                <td><a href="${post.post_url}" target="_blank" class="btn btn-sm btn-primary">View</a></td>
-                            </tr>`;
-                        postsTbody.innerHTML += row;
-                    });
-
-                    updateCharts(data.posts);
-                }
-            } catch (error) {
-                alert('Error scraping data: ' + error.message);
+        // Likes Chart
+        const likesCtx = document.getElementById('likesChart').getContext('2d');
+        likesChart = new Chart(likesCtx, {
+            type: 'bar',
+            data: {
+                labels: posts.map((_, i) => `Post ${i + 1}`),
+                datasets: [{
+                    label: 'Likes per Post',
+                    data: posts.map(post => post.likes),
+                    backgroundColor: 'rgba(0, 149, 246, 0.6)',
+                    borderColor: 'rgba(0, 149, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
             }
         });
 
-        function updateCharts(posts) {
-            if (likesChart) likesChart.destroy();
-            if (hashtagsChart) hashtagsChart.destroy();
+        // Comments Chart
+        const commentsCtx = document.getElementById('commentsChart').getContext('2d');
+        commentsChart = new Chart(commentsCtx, {
+            type: 'bar',
+            data: {
+                labels: posts.map((_, i) => `Post ${i + 1}`),
+                datasets: [{
+                    label: 'Comments per Post',
+                    data: posts.map(post => post.comments_count),
+                    backgroundColor: 'rgba(219, 43, 116, 0.6)',
+                    borderColor: 'rgba(219, 43, 116, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
 
-            const likesCtx = document.getElementById('likesChart').getContext('2d');
-            likesChart = new Chart(likesCtx, {
-                type: 'bar',
-                data: {
-                    labels: posts.map((_, i) => `Post ${i + 1}`),
-                    datasets: [{
-                        label: 'Likes per Post',
-                        data: posts.map(post => post.likes),
-                        backgroundColor: 'rgba(0, 149, 246, 0.6)',
-                        borderColor: 'rgba(0, 149, 246, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
+        // Hashtags Chart (existing doughnut chart)
+        const hashtagCount = {};
+        posts.forEach(post => {
+            post.hashtags.forEach(tag => {
+                hashtagCount[tag] = (hashtagCount[tag] || 0) + 1;
+            });
+        });
+
+        const hashtagsCtx = document.getElementById('hashtagsChart').getContext('2d');
+        hashtagsChart = new Chart(hashtagsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(hashtagCount),
+                datasets: [{
+                    data: Object.values(hashtagCount),
+                    backgroundColor: [
+                        '#0095f6', '#405de6', '#5851db', '#833ab4',
+                        '#c13584', '#e1306c', '#fd1d1d', '#f77737'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
                 }
-            });
+            }
+        });
+    }
+</script>
 
-            const hashtagCount = {};
-            posts.forEach(post => {
-                post.hashtags.forEach(tag => {
-                    hashtagCount[tag] = (hashtagCount[tag] || 0) + 1;
-                });
-            });
-
-            const hashtagsCtx = document.getElementById('hashtagsChart').getContext('2d');
-            hashtagsChart = new Chart(hashtagsCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(hashtagCount),
-                    datasets: [{
-                        data: Object.values(hashtagCount),
-                        backgroundColor: [
-                            '#0095f6', '#405de6', '#5851db', '#833ab4',
-                            '#c13584', '#e1306c', '#fd1d1d', '#f77737'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-    </script>
 </body>
 </html>
