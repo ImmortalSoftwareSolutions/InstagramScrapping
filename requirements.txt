@@ -1,9 +1,0 @@
-python-dotenv
-playwright
-pandas
-ipykernel
-numpy
-matplotlib
-scikit-learn
-flask
-seaborn
