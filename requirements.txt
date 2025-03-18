@@ -1,0 +1,7 @@
+python-dotenv
+playwright
+pandas
+numpy
+matplotlib
+scikit-learn
+flask
