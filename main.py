@@ -7,7 +7,7 @@ from config import BROWSER_CONFIG, VIEWPORT_CONFIG, get_random_user_agent
 from data_handler import save_to_file  # Added to restore file-saving functionality
 import random
 import logging
-
+import os
 def main():
     print("Starting Instagram Scraper (No Login Required)...")
 app = Flask(__name__)
